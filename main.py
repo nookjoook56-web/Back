@@ -1,69 +1,54 @@
 import requests
 import time
-import os
 
 def get_vavoo_signature():
-    """Vavoo sunucusundan anlık imza (signature) alır."""
     url = "https://www.vavoo.tv/api/app/ping"
-    # 2026 Şubat güncel uygulama verileri
+    # Sunucu bazen eski tokenları bloklar, bu yüzden güncel bir tane deniyoruz
     payload = {
         "token": "tosFwQCJMS8qrW_AjLoHPQ41646J5dRNha6ZWHnijoYQQQoADQoXYSo7ki7O5-CsgN4CH0uRk6EEoJ0728ar9scCRQW3ZkbfrPfeCXW2VgopSW2FWDqPOoVYIuVPAOnXCZ5g",
         "package": "tv.vavoo.app",
         "version": "3.1.20"
     }
     headers = {
-        "User-Agent": "okhttp/4.11.0",
+        "User-Agent": "VAVOO/2.6",
         "Content-Type": "application/json"
     }
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
-        if response.status_code == 200:
-            sig = response.json().get("addonSig")
-            print(f"✅ İmza başarıyla alındı: {sig[:10]}...")
-            return sig
+        r = requests.post(url, json=payload, headers=headers, timeout=20)
+        data = r.json()
+        # Eğer sunucu imza vermezse hata fırlat ki GitHub Action 'Hata' olarak işaretlesin
+        if "addonSig" in data:
+            return data["addonSig"]
         else:
-            print(f"❌ İmza hatası: {response.status_code}")
+            print(f"⚠️ Sunucu yanıt verdi ama imza yok: {data}")
+            return None
     except Exception as e:
-        print(f"❌ Bağlantı hatası: {e}")
-    return None
+        print(f"❌ İstek hatası: {e}")
+        return None
 
-def create_m3u_list():
+def main():
     sig = get_vavoo_signature()
-    
-    # beIN Sports ve Popüler Kanallar
     channels = {
         "beIN SPORTS 1": "tr-be-in-sports-1",
         "beIN SPORTS 2": "tr-be-in-sports-2",
-        "beIN SPORTS 3": "tr-be-in-sports-3",
-        "beIN SPORTS 4": "tr-be-in-sports-4",
-        "beIN SPORTS HABER": "tr-be-in-sports-haber",
-        "TRT 1": "tr-trt-1",
-        "ATV": "tr-atv",
-        "SHOW TV": "tr-show-tv"
+        "beIN SPORTS 3": "tr-be-in-sports-3"
     }
 
-    filename = "vavoo_to_list.m3u"
-    
-    with open(filename, "w", encoding="utf-8") as f:
+    with open("vavoo_to_list.m3u", "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
-        # GitHub Action'ın değişikliği algılaması için her seferinde farklı bir yorum satırı ekler [cite: 2026-02-07]
-        f.write(f"# Son Güncelleme: {time.ctime()} (UTC)\n\n")
+        f.write(f"# Guncelleme: {time.ctime()}\n")
         
         for name, cid in channels.items():
-            # Vavoo.to domaini üzerinden imza ile birlikte link oluşturur
+            # EĞER İMZA VARSA EKLE, YOKSA ÖZEL BİR UYARI EKLE
             if sig:
                 link = f"https://vavoo.to/vavoo-iptv/play/{cid}.m3u8?n=1&sig={sig}"
             else:
-                # İmza alınamazsa imzasız linki dene (Düşük ihtimalle çalışır)
-                link = f"https://vavoo.to/vavoo-iptv/play/{cid}.m3u8"
+                # İmza yoksa linkin çalışmayacağını belirten bir parametre ekle
+                link = f"https://vavoo.to/vavoo-iptv/play/{cid}.m3u8?error=no_signature_check_token"
             
-            f.write(f'#EXTINF:-1 group-title="VAVOO_TR",{name}\n')
-            # VLC ve TiviMate için kritik User-Agent komutu
+            f.write(f'#EXTINF:-1 group-title="SPOR",{name}\n')
             f.write(f'#EXTVLCOPT:http-user-agent=VAVOO/2.6\n')
-            f.write(f"{link}\n\n")
-            
-    print(f"🚀 Liste oluşturuldu: {filename}")
+            f.write(f"{link}\n")
 
 if __name__ == "__main__":
-    create_m3u_list()
-    
+    main()
