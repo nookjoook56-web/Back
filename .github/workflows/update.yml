@@ -1,12 +1,14 @@
 name: Vavoo Liste Guncelle
 on:
   schedule:
-    - cron: '0 */6 * * *' # Her 6 saatte bir çalışır
-  workflow_dispatch: # Manuel çalıştırma butonu
+    - cron: '0 */6 * * *' 
+  workflow_dispatch: 
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions: # Yazma izni için bu blok kritik
+      contents: write
     steps:
       - uses: actions/checkout@v3
       - name: Python Kur
@@ -22,6 +24,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add vavoo_to_list.m3u
-          git commit -m "Liste Guncellendi: $(date)"
+          # Değişiklik yoksa hata vermemesi için || true ekledik
+          git commit -m "Liste Guncellendi: $(date)" || exit 0
           git push
           
